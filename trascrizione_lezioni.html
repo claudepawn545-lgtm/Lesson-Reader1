@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trascrizione Lezioni</title>
+    
+    <!-- Tailwind CSS per lo styling responsivo e moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome per le icone -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            /* Previene il pull-to-refresh fastidioso sui tablet */
+            overscroll-behavior-y: contain; 
+        }
+        
+        /* Animazione per l'indicatore di registrazione */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .recording-dot {
+            animation: pulse-ring 2s infinite;
+        }
+
+        /* Stile personalizzato per la scrollbar */
+        textarea::-webkit-scrollbar {
+            width: 12px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 8px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 p-4 md:p-8 flex flex-col items-center">
+
+    <main class="w-full max-w-4xl bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col h-[90vh] md:h-auto">
+        
+        <!-- Header -->
+        <header class="bg-blue-600 text-white p-6 md:p-8 text-center relative">
+            <h1 class="text-2xl md:text-4xl font-bold mb-2 flex items-center justify-center gap-3">
+                <i class="fas fa-graduation-cap"></i> Trascrizione Appunti
+            </h1>
+            <p class="text-blue-100 text-sm md:text-base">Registra e converti le tue lezioni in testo in tempo reale</p>
+        </header>
+
+        <div class="p-4 md:p-8 flex flex-col flex-grow gap-6">
+            
+            <!-- Pannello di Stato -->
+            <div class="flex items-center justify-center bg-slate-100 p-4 rounded-xl border border-slate-200">
+                <div id="status-indicator" class="w-4 h-4 rounded-full bg-slate-400 mr-3"></div>
+                <span id="status-text" class="text-lg font-medium text-slate-700">Pronto per iniziare</span>
+            </div>
+
+            <!-- Avviso per browser non supportati -->
+            <div id="unsupported-msg" class="hidden bg-red-100 text-red-700 p-4 rounded-xl border border-red-200 text-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Il tuo browser non supporta il riconoscimento vocale. Usa Google Chrome, Edge o Safari su iOS.
+            </div>
+
+            <!-- Controlli Principali (Touch Friendly) -->
+            <div class="grid grid-cols-3 gap-3 md:gap-6">
+                <button id="btn-start" class="flex flex-col items-center justify-center py-4 px-2 md:py-6 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white rounded-2xl shadow-md transition-all active:scale-95 touch-manipulation">
+                    <i class="fas fa-microphone text-2xl md:text-3xl mb-2"></i>
+                    <span class="font-bold text-sm md:text-xl">Inizia</span>
+                </button>
+                
+                <button id="btn-pause" disabled class="flex flex-col items-center justify-center py-4 px-2 md:py-6 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-2xl shadow-md transition-all active:scale-95 touch-manipulation opacity-50 cursor-not-allowed">
+                    <i class="fas fa-pause text-2xl md:text-3xl mb-2"></i>
+                    <span class="font-bold text-sm md:text-xl">Pausa</span>
+                </button>
+
+                <button id="btn-stop" disabled class="flex flex-col items-center justify-center py-4 px-2 md:py-6 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-2xl shadow-md transition-all active:scale-95 touch-manipulation opacity-50 cursor-not-allowed">
+                    <i class="fas fa-stop text-2xl md:text-3xl mb-2"></i>
+                    <span class="font-bold text-sm md:text-xl">Ferma</span>
+                </button>
+            </div>
+
+            <!-- Area di Trascrizione -->
+            <div class="flex-grow flex flex-col gap-2 relative">
+                <!-- Testo temporaneo (mentre si parla) -->
+                <div class="min-h-[2rem] px-2 text-blue-600 italic font-medium flex items-center">
+                    <i id="interim-icon" class="fas fa-assistive-listening-systems mr-2 hidden"></i>
+                    <span id="interim-text"></span>
+                </div>
+                
+                <!-- Testo finale consolidato -->
+                <textarea id="final-text" class="flex-grow w-full h-48 md:h-72 p-4 md:p-6 text-lg md:text-xl border-2 border-slate-300 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 resize-none transition-all" placeholder="La trascrizione apparirà qui... Puoi anche digitare per correggere gli appunti."></textarea>
+            </div>
+
+            <!-- Azioni Documento -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mt-auto">
+                <button id="btn-copy" class="flex items-center justify-center gap-2 py-4 px-6 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-800 rounded-xl font-semibold transition-all active:scale-95 touch-manipulation">
+                    <i class="fas fa-copy"></i> Copia Testo
+                </button>
+                <button id="btn-download" class="flex items-center justify-center gap-2 py-4 px-6 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800 rounded-xl font-semibold transition-all active:scale-95 touch-manipulation">
+                    <i class="fas fa-download"></i> Scarica .txt
+                </button>
+                <button id="btn-clear" class="flex items-center justify-center gap-2 py-4 px-6 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 rounded-xl font-semibold transition-all active:scale-95 touch-manipulation md:col-span-1">
+                    <i class="fas fa-trash-alt"></i> Cancella
+                </button>
+            </div>
+            
+        </div>
+    </main>
+
+    <!-- Notifica Toast (es. "Testo copiato!") -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 pointer-events-none z-50">
+        <i class="fas fa-check-circle text-green-400"></i>
+        <span id="toast-msg">Operazione completata</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Riferimenti DOM
+            const btnStart = document.getElementById('btn-start');
+            const btnPause = document.getElementById('btn-pause');
+            const btnStop = document.getElementById('btn-stop');
+            const btnCopy = document.getElementById('btn-copy');
+            const btnDownload = document.getElementById('btn-download');
+            const btnClear = document.getElementById('btn-clear');
+            
+            const finalTextArea = document.getElementById('final-text');
+            const interimTextSpan = document.getElementById('interim-text');
+            const interimIcon = document.getElementById('interim-icon');
+            
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const unsupportedMsg = document.getElementById('unsupported-msg');
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+
+            // Variabili di stato
+            let recognition = null;
+            let isRecording = false;    // Indica se l'utente vuole registrare
+            let isRecognizing = false;  // Indica se l'API sta fisicamente ascoltando
+            let finalTranscript = '';
+
+            // Controllo supporto API
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!window.SpeechRecognition) {
+                unsupportedMsg.classList.remove('hidden');
+                btnStart.disabled = true;
+                btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+                return; // Ferma l'esecuzione dello script
+            }
+
+            // Inizializzazione riconoscimento
+            recognition = new window.SpeechRecognition();
+            recognition.continuous = true;      // Continua ad ascoltare
+            recognition.interimResults = true;  // Mostra risultati parziali mentre si parla
+            recognition.lang = 'it-IT';         // Lingua Italiana
+
+            recognition.onstart = function() {
+                isRecognizing = true;
+                updateUIState('recording');
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+
+                // Cicla attraverso i risultati (da dove eravamo rimasti)
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        // Aggiunge spazio finale e capitalizza se necessario
+                        let newText = event.results[i][0].transcript.trim() + ' ';
+                        
+                        // Capitalizzazione automatica base
+                        if (finalTranscript.length === 0 || finalTranscript.match(/[\.\?\!]\s*$/)) {
+                            newText = newText.charAt(0).toUpperCase() + newText.slice(1);
+                        }
+                        
+                        finalTranscript += newText;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                // Aggiorna l'interfaccia
+                finalTextArea.value = finalTranscript;
+                interimTextSpan.textContent = interimTranscript;
+                
+                if (interimTranscript.trim().length > 0) {
+                    interimIcon.classList.remove('hidden');
+                } else {
+                    interimIcon.classList.add('hidden');
+                }
+
+                // Auto-scroll verso il basso del textarea (utile sui tablet)
+                finalTextArea.scrollTop = finalTextArea.scrollHeight;
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Errore Speech Recognition:", event.error);
+                
+                if (event.error === 'not-allowed') {
+                    updateUIState('error', "Permesso microfono negato!");
+                    isRecording = false;
+                } else if (event.error === 'network') {
+                    updateUIState('error', "Errore di rete");
+                    isRecording = false;
+                }
+                // Ignoriamo 'no-speech' perché verrà gestito dal riavvio automatico
+            };
+
+            recognition.onend = function() {
+                isRecognizing = false;
+                
+                // CRITICO: I browser (specialmente Android/Chrome) fermano l'ascolto 
+                // dopo un po' di silenzio. Se l'utente non ha premuto Pausa/Ferma, riavviamo.
+                if (isRecording) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.error("Errore nel riavvio:", e);
+                    }
+                } else {
+                    updateUIState('stopped');
+                    interimTextSpan.textContent = '';
+                    interimIcon.classList.add('hidden');
+                }
+            };
+
+            // Gestione dei bottoni
+            btnStart.addEventListener('click', () => {
+                if (!isRecording) {
+                    isRecording = true;
+                    finalTranscript = finalTextArea.value; // Sincronizza col testo attuale
+                    try {
+                        recognition.start();
+                    } catch(e) {
+                        // Se è già avviato, ignora
+                    }
+                }
+            });
+
+            btnPause.addEventListener('click', () => {
+                isRecording = false;
+                recognition.stop();
+                updateUIState('paused');
+            });
+
+            btnStop.addEventListener('click', () => {
+                isRecording = false;
+                recognition.stop();
+                updateUIState('stopped');
+            });
+
+            // Permette all'utente di scrivere manualmente sincronizzando la variabile
+            finalTextArea.addEventListener('input', () => {
+                finalTranscript = finalTextArea.value;
+            });
+
+            // Utility: Copia testo
+            btnCopy.addEventListener('click', () => {
+                if (!finalTextArea.value) {
+                    showToast("Niente da copiare!", true);
+                    return;
+                }
+                
+                // Metodo moderno
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(finalTextArea.value).then(() => {
+                        showToast("Testo copiato negli appunti!");
+                    }).catch(err => {
+                        fallbackCopyTextToClipboard(finalTextArea.value);
+                    });
+                } else {
+                    fallbackCopyTextToClipboard(finalTextArea.value);
+                }
+            });
+
+            function fallbackCopyTextToClipboard(text) {
+                finalTextArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast("Testo copiato negli appunti!");
+                } catch (err) {
+                    showToast("Errore durante la copia", true);
+                }
+                window.getSelection().removeAllRanges();
+            }
+
+            // Utility: Scarica file .txt
+            btnDownload.addEventListener('click', () => {
+                if (!finalTextArea.value) {
+                    showToast("Niente da scaricare!", true);
+                    return;
+                }
+                
+                const blob = new Blob([finalTextArea.value], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                
+                // Genera nome file con data e ora
+                const date = new Date();
+                const dateString = `${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}_${date.getHours()}${date.getMinutes()}`;
+                
+                a.href = url;
+                a.download = `Lezione_${dateString}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Pulizia
+                window.setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
+                showToast("Download avviato!");
+            });
+
+            // Utility: Pulisci
+            btnClear.addEventListener('click', () => {
+                // Potremmo usare un confirm(), ma le istruzioni richiedono di evitarlo.
+                // In un'app reale si farebbe una modale custom, qui resettiamo direttamente.
+                if(finalTextArea.value.length > 0) {
+                    finalTextArea.value = '';
+                    finalTranscript = '';
+                    showToast("Testo cancellato");
+                }
+            });
+
+            // Funzione per gestire lo stato dell'UI
+            function updateUIState(state, customMessage = null) {
+                switch(state) {
+                    case 'recording':
+                        statusIndicator.className = 'w-4 h-4 rounded-full bg-red-500 mr-3 recording-dot';
+                        statusText.textContent = customMessage || 'Ascolto in corso...';
+                        statusText.className = 'text-lg font-medium text-red-600';
+                        
+                        // Bottoni
+                        btnStart.disabled = true;
+                        btnStart.classList.add('opacity-50', 'cursor-not-allowed', 'scale-95');
+                        
+                        btnPause.disabled = false;
+                        btnPause.classList.remove('opacity-50', 'cursor-not-allowed');
+                        
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('opacity-50', 'cursor-not-allowed');
+                        break;
+                        
+                    case 'paused':
+                        statusIndicator.className = 'w-4 h-4 rounded-full bg-amber-500 mr-3';
+                        statusText.textContent = customMessage || 'In pausa';
+                        statusText.className = 'text-lg font-medium text-amber-600';
+                        
+                        btnStart.disabled = false;
+                        btnStart.classList.remove('opacity-50', 'cursor-not-allowed', 'scale-95');
+                        btnStart.querySelector('span').textContent = "Riprendi";
+                        
+                        btnPause.disabled = true;
+                        btnPause.classList.add('opacity-50', 'cursor-not-allowed');
+                        
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('opacity-50', 'cursor-not-allowed');
+                        break;
+                        
+                    case 'stopped':
+                    case 'error':
+                        statusIndicator.className = state === 'error' ? 'w-4 h-4 rounded-full bg-red-700 mr-3' : 'w-4 h-4 rounded-full bg-slate-400 mr-3';
+                        statusText.textContent = customMessage || (state === 'error' ? 'Errore' : 'Pronto per iniziare');
+                        statusText.className = state === 'error' ? 'text-lg font-medium text-red-700' : 'text-lg font-medium text-slate-700';
+                        
+                        btnStart.disabled = false;
+                        btnStart.classList.remove('opacity-50', 'cursor-not-allowed', 'scale-95');
+                        btnStart.querySelector('span').textContent = "Inizia";
+                        
+                        btnPause.disabled = true;
+                        btnPause.classList.add('opacity-50', 'cursor-not-allowed');
+                        
+                        btnStop.disabled = true;
+                        btnStop.classList.add('opacity-50', 'cursor-not-allowed');
+                        break;
+                }
+            }
+
+            // Funzione Toast
+            let toastTimeout;
+            function showToast(message, isError = false) {
+                toastMsg.textContent = message;
+                
+                // Cambia icona/colore in base al tipo di messaggio
+                const icon = toast.querySelector('i');
+                if (isError) {
+                    icon.className = 'fas fa-exclamation-circle text-red-400';
+                } else {
+                    icon.className = 'fas fa-check-circle text-green-400';
+                }
+
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
