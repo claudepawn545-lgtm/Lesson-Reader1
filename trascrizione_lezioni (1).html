@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="it" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trascrizione Lezioni Pro</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior-y: contain; 
+            touch-action: manipulation;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .recording-dot {
+            animation: pulse-ring 2s infinite;
+        }
+
+        /* Custom Scrollbar */
+        textarea::-webkit-scrollbar {
+            width: 10px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 8px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 8px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200 flex flex-col justify-between p-3 md:p-6">
+
+    <div class="max-w-5xl mx-auto w-full flex-grow flex flex-col gap-4">
+        
+        <!-- Header -->
+        <header class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 flex items-center justify-between transition-colors">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-xl">
+                    <i class="fas fa-graduation-cap text-2xl md:text-3xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold">Trascrizione Lezioni</h1>
+                    <p class="text-xs md:text-sm text-slate-500 dark:text-slate-400">100% Gratuito • Salvataggio Automatico • Backup Audio</p>
+                </div>
+            </div>
+            
+            <!-- Controls Top-Right -->
+            <div class="flex items-center gap-2">
+                <button id="btn-theme-toggle" class="p-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl text-slate-600 dark:text-slate-300 transition-colors" title="Cambia Tema">
+                    <i class="fas fa-moon dark:hidden text-lg"></i>
+                    <i class="fas fa-sun hidden dark:block text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stato Browser Non Supportato -->
+        <div id="unsupported-msg" class="hidden bg-red-100 border border-red-300 text-red-800 dark:bg-red-900/40 dark:border-red-800 dark:text-red-200 p-4 rounded-2xl text-center">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Il tuo browser non supporta il riconoscimento vocale. Usa Google Chrome, Safari o Microsoft Edge.
+        </div>
+
+        <!-- Main Dashboard Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 flex flex-col gap-4">
+            
+            <!-- Visualizer & Status Bar -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                <div class="flex items-center gap-3">
+                    <div id="status-indicator" class="w-3.5 h-3.5 rounded-full bg-slate-400"></div>
+                    <div>
+                        <span id="status-text" class="font-semibold text-slate-700 dark:text-slate-200">Pronto all'uso</span>
+                        <div id="timer-text" class="text-xs font-mono text-slate-400 dark:text-slate-500 hidden">Durata: 00:00:00</div>
+                    </div>
+                </div>
+
+                <!-- Canvas per Visualizzatore Audio Microfono -->
+                <div class="w-full sm:w-48 h-10 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden relative flex items-center justify-center">
+                    <canvas id="audio-visualizer" class="w-full h-full block"></canvas>
+                    <span id="visualizer-placeholder" class="absolute text-xs text-slate-400 font-medium pointer-events-none">VU Meter Microfono</span>
+                </div>
+            </div>
+
+            <!-- Bottoni di Controllo Principali -->
+            <div class="grid grid-cols-3 gap-3 md:gap-4">
+                <button id="btn-start" class="flex flex-col md:flex-row items-center justify-center gap-2 py-4 md:py-5 px-3 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white rounded-xl shadow-md transition-all active:scale-95 font-bold text-base md:text-lg">
+                    <i class="fas fa-microphone text-xl md:text-2xl"></i>
+                    <span>Inizia</span>
+                </button>
+                
+                <button id="btn-pause" disabled class="flex flex-col md:flex-row items-center justify-center gap-2 py-4 md:py-5 px-3 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl shadow-md transition-all active:scale-95 font-bold text-base md:text-lg opacity-50 cursor-not-allowed">
+                    <i class="fas fa-pause text-xl md:text-2xl"></i>
+                    <span>Pausa</span>
+                </button>
+
+                <button id="btn-stop" disabled class="flex flex-col md:flex-row items-center justify-center gap-2 py-4 md:py-5 px-3 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-xl shadow-md transition-all active:scale-95 font-bold text-base md:text-lg opacity-50 cursor-not-allowed">
+                    <i class="fas fa-stop text-xl md:text-2xl"></i>
+                    <span>Ferma</span>
+                </button>
+            </div>
+
+            <!-- Toggle opzioni -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2 text-sm text-slate-600 dark:text-slate-300 border-t border-slate-100 dark:border-slate-700">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <input type="checkbox" id="toggle-timestamps" checked class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 dark:border-slate-600 dark:bg-slate-700">
+                    <span>Inserisci Timestamp automatici <code class="text-xs bg-slate-200 dark:bg-slate-700 px-1 rounded">[10:15:30]</code></span>
+                </label>
+
+                <div id="audio-backup-status" class="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                    <i class="fas fa-shield-alt text-blue-500"></i> Backup Audio Reale Attivo
+                </div>
+            </div>
+        </div>
+
+        <!-- Transcript Textarea Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 flex flex-col flex-grow gap-3 transition-colors">
+            
+            <div class="flex items-center justify-between">
+                <label for="final-text" class="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                    <i class="fas fa-align-left text-blue-500"></i> Trascrizione della Lezione:
+                </label>
+                <span id="save-badge" class="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium transition-opacity opacity-0">
+                    <i class="fas fa-check-circle mr-1"></i> Salvato
+                </span>
+            </div>
+
+            <!-- Testo Provvisorio (in tempo reale mentre si parla) -->
+            <div class="min-h-[1.75rem] px-1 text-blue-600 dark:text-blue-400 italic text-sm md:text-base flex items-center gap-2">
+                <i id="interim-icon" class="fas fa-assistive-listening-systems animate-pulse hidden"></i>
+                <span id="interim-text"></span>
+            </div>
+
+            <!-- Area di testo principale -->
+            <textarea id="final-text" class="w-full flex-grow min-h-[260px] md:min-h-[320px] p-4 text-base md:text-lg border border-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y transition-all" placeholder="La trascrizione della lezione apparirà qui in tempo reale... Puoi anche digitare liberamente per aggiungere note manuali."></textarea>
+
+            <!-- Pulsanti di Azione Documento -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3 pt-2">
+                <button id="btn-copy" class="flex items-center justify-center gap-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 active:bg-slate-300 text-slate-700 dark:text-slate-200 rounded-xl font-medium text-sm transition-all">
+                    <i class="fas fa-copy"></i> Copia Testo
+                </button>
+                
+                <button id="btn-download-txt" class="flex items-center justify-center gap-2 py-3 px-4 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-xl font-medium text-sm transition-all">
+                    <i class="fas fa-file-alt"></i> Scarica .TXT
+                </button>
+
+                <button id="btn-download-audio" disabled class="flex items-center justify-center gap-2 py-3 px-4 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded-xl font-medium text-sm transition-all opacity-50 cursor-not-allowed" title="Disponibile a fine registrazione">
+                    <i class="fas fa-file-audio"></i> Scarica Audio (.webm)
+                </button>
+
+                <button id="btn-clear" class="flex items-center justify-center gap-2 py-3 px-4 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-xl font-medium text-sm transition-all">
+                    <i class="fas fa-trash-alt"></i> Cancella Testo
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal Personalizzato per Conferma Cancellazione -->
+    <div id="modal-confirm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 transform scale-95 transition-transform duration-200" id="modal-box">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+                <i class="fas fa-exclamation-triangle text-amber-500"></i> Cancellare la trascrizione?
+            </h3>
+            <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Sei sicuro di voler cancellare tutto il testo trascritto? Questa azione pulirà anche il salvataggio automatico sul dispositivo.</p>
+            <div class="flex justify-end gap-3">
+                <button id="btn-modal-cancel" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium transition-colors">
+                    Annulla
+                </button>
+                <button id="btn-modal-confirm" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-colors">
+                    Sì, Cancella
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-800 px-5 py-3 rounded-xl shadow-xl transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3 pointer-events-none z-50 text-sm font-medium">
+        <i id="toast-icon" class="fas fa-check-circle text-green-400 dark:text-green-600"></i>
+        <span id="toast-msg">Operazione completata</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const btnStart = document.getElementById('btn-start');
+            const btnPause = document.getElementById('btn-pause');
+            const btnStop = document.getElementById('btn-stop');
+            const btnCopy = document.getElementById('btn-copy');
+            const btnDownloadTxt = document.getElementById('btn-download-txt');
+            const btnDownloadAudio = document.getElementById('btn-download-audio');
+            const btnClear = document.getElementById('btn-clear');
+            const btnThemeToggle = document.getElementById('btn-theme-toggle');
+            const toggleTimestamps = document.getElementById('toggle-timestamps');
+
+            const finalText = document.getElementById('final-text');
+            const interimText = document.getElementById('interim-text');
+            const interimIcon = document.getElementById('interim-icon');
+            
+            const statusIndicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            const timerText = document.getElementById('timer-text');
+            const saveBadge = document.getElementById('save-badge');
+            const unsupportedMsg = document.getElementById('unsupported-msg');
+
+            const canvas = document.getElementById('audio-visualizer');
+            const canvasCtx = canvas.getContext('2d');
+            const visualizerPlaceholder = document.getElementById('visualizer-placeholder');
+
+            const modalConfirm = document.getElementById('modal-confirm');
+            const modalBox = document.getElementById('modal-box');
+            const btnModalCancel = document.getElementById('btn-modal-cancel');
+            const btnModalConfirm = document.getElementById('btn-modal-confirm');
+
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            // Application States
+            let recognition = null;
+            let mediaRecorder = null;
+            let audioChunks = [];
+            let audioBlob = null;
+            
+            let audioCtx = null;
+            let analyser = null;
+            let micStream = null;
+            let visualizerAnimId = null;
+
+            let isRecording = false; // User intention state
+            let isPaused = false;
+            let startTime = null;
+            let timerInterval = null;
+            let elapsedSeconds = 0;
+
+            const LOCAL_STORAGE_KEY = 'trascrizione_lezione_draft';
+
+            // 1. Dark Mode Setup
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+
+            btnThemeToggle.addEventListener('click', () => {
+                if (document.documentElement.classList.contains('dark')) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                }
+            });
+
+            // 2. Restore Draft from LocalStorage
+            const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedDraft) {
+                finalText.value = savedDraft;
+                showToast("Lezione ripristinata dall'ultimo salvataggio!");
+            }
+
+            // Auto-save on manual edit
+            finalText.addEventListener('input', triggerAutoSave);
+
+            function triggerAutoSave() {
+                localStorage.setItem(LOCAL_STORAGE_KEY, finalText.value);
+                saveBadge.classList.remove('opacity-0');
+                setTimeout(() => {
+                    saveBadge.classList.add('opacity-0');
+                }, 1500);
+            }
+
+            // 3. Speech Recognition Engine Setup
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!window.SpeechRecognition) {
+                unsupportedMsg.classList.remove('hidden');
+                btnStart.disabled = true;
+                btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+                return;
+            }
+
+            recognition = new window.SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'it-IT';
+
+            recognition.onstart = function() {
+                updateUI('recording');
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                let finalAdditions = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        let textChunk = event.results[i][0].transcript.trim();
+                        if (textChunk.length > 0) {
+                            if (toggleTimestamps.checked) {
+                                const timestamp = getFormattedTimestamp();
+                                // Add timestamp if starting new paragraph or text is empty
+                                if (finalText.value.length === 0 || finalText.value.endsWith('\n')) {
+                                    finalAdditions += `${timestamp} ${capitalizeFirstLetter(textChunk)}\n\n`;
+                                } else {
+                                    finalAdditions += ` ${textChunk}.\n\n`;
+                                }
+                            } else {
+                                finalAdditions += `${capitalizeFirstLetter(textChunk)}. `;
+                            }
+                        }
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalAdditions.length > 0) {
+                    finalText.value += finalAdditions;
+                    triggerAutoSave();
+                    finalText.scrollTop = finalText.scrollHeight;
+                }
+
+                interimText.textContent = interimTranscript;
+                if (interimTranscript.trim().length > 0) {
+                    interimIcon.classList.remove('hidden');
+                } else {
+                    interimIcon.classList.add('hidden');
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.warn("Speech recognition error:", event.error);
+                if (event.error === 'not-allowed') {
+                    showToast("Permesso del microfono negato!", true);
+                    stopAllRecording();
+                }
+            };
+
+            recognition.onend = function() {
+                // Auto-Restart logic if silent or interrupted unexpectedly
+                if (isRecording && !isPaused) {
+                    try {
+                        recognition.start();
+                    } catch(e) {
+                        console.error("Auto-restart speech recognition error:", e);
+                    }
+                } else if (!isRecording && !isPaused) {
+                    updateUI('stopped');
+                }
+            };
+
+            // 4. Start Recording Audio and Speech
+            async function startAllRecording() {
+                try {
+                    // Request microphone stream once for both recorder and visualizer
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    
+                    // A. MediaRecorder Setup (Real Audio Backup)
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(micStream);
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+                    mediaRecorder.onstop = () => {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        btnDownloadAudio.disabled = false;
+                        btnDownloadAudio.classList.remove('opacity-50', 'cursor-not-allowed');
+                    };
+                    mediaRecorder.start(1000); // Collect slices every second
+
+                    // B. AudioContext Visualizer Setup
+                    setupAudioVisualizer(micStream);
+
+                    // C. Speech Recognition Start
+                    isRecording = true;
+                    isPaused = false;
+                    recognition.start();
+
+                    // D. Timer
+                    startTimer();
+
+                } catch (err) {
+                    console.error("Microphone access error:", err);
+                    showToast("Impossibile accedere al microfono!", true);
+                    updateUI('stopped');
+                }
+            }
+
+            function pauseAllRecording() {
+                isPaused = true;
+                if (recognition) recognition.stop();
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.pause();
+                stopTimer();
+                updateUI('paused');
+            }
+
+            function resumeAllRecording() {
+                isPaused = false;
+                if (recognition) recognition.start();
+                if (mediaRecorder && mediaRecorder.state === 'paused') mediaRecorder.resume();
+                startTimer();
+                updateUI('recording');
+            }
+
+            function stopAllRecording() {
+                isRecording = false;
+                isPaused = false;
+
+                if (recognition) recognition.stop();
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+
+                // Stop mic stream tracks
+                if (micStream) {
+                    micStream.getTracks().forEach(track => track.stop());
+                }
+
+                stopTimer();
+                stopAudioVisualizer();
+                updateUI('stopped');
+            }
+
+            // 5. Visualizer VU Meter on Canvas
+            function setupAudioVisualizer(stream) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 64;
+                
+                const source = audioCtx.createMediaStreamSource(stream);
+                source.connect(analyser);
+
+                visualizerPlaceholder.classList.add('hidden');
+                drawVisualizer();
+            }
+
+            function drawVisualizer() {
+                if (!analyser) return;
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                const width = canvas.width = canvas.parentElement.clientWidth;
+                const height = canvas.height = canvas.parentElement.clientHeight;
+
+                function renderFrame() {
+                    visualizerAnimId = requestAnimationFrame(renderFrame);
+                    analyser.getByteFrequencyData(dataArray);
+
+                    canvasCtx.clearRect(0, 0, width, height);
+
+                    const barWidth = (width / bufferLength) * 1.5;
+                    let x = 0;
+
+                    for (let i = 0; i < bufferLength; i++) {
+                        const barHeight = (dataArray[i] / 255) * height;
+                        
+                        // Dynamic gradient (blue to green)
+                        const isDark = document.documentElement.classList.contains('dark');
+                        canvasCtx.fillStyle = isDark ? `rgb(59, 130, 246)` : `rgb(37, 99, 235)`;
+                        
+                        canvasCtx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+                        x += barWidth;
+                    }
+                }
+                renderFrame();
+            }
+
+            function stopAudioVisualizer() {
+                if (visualizerAnimId) cancelAnimationFrame(visualizerAnimId);
+                if (audioCtx) audioCtx.close();
+                audioCtx = null;
+                analyser = null;
+                canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+                visualizerPlaceholder.classList.remove('hidden');
+            }
+
+            // 6. UI Controls & Listeners
+            btnStart.addEventListener('click', () => {
+                if (!isRecording && !isPaused) {
+                    startAllRecording();
+                } else if (isPaused) {
+                    resumeAllRecording();
+                }
+            });
+
+            btnPause.addEventListener('click', () => {
+                if (isRecording && !isPaused) {
+                    pauseAllRecording();
+                }
+            });
+
+            btnStop.addEventListener('click', () => {
+                stopAllRecording();
+            });
+
+            function updateUI(state) {
+                switch(state) {
+                    case 'recording':
+                        statusIndicator.className = 'w-3.5 h-3.5 rounded-full bg-red-500 recording-dot';
+                        statusText.textContent = 'Registrazione e trascrizione in corso...';
+                        statusText.className = 'font-semibold text-red-600 dark:text-red-400';
+                        
+                        btnStart.disabled = true;
+                        btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+
+                        btnPause.disabled = false;
+                        btnPause.classList.remove('opacity-50', 'cursor-not-allowed');
+
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('opacity-50', 'cursor-not-allowed');
+                        break;
+
+                    case 'paused':
+                        statusIndicator.className = 'w-3.5 h-3.5 rounded-full bg-amber-500';
+                        statusText.textContent = 'Registrazione in pausa';
+                        statusText.className = 'font-semibold text-amber-600 dark:text-amber-400';
+
+                        btnStart.disabled = false;
+                        btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btnStart.querySelector('span').textContent = "Riprendi";
+
+                        btnPause.disabled = true;
+                        btnPause.classList.add('opacity-50', 'cursor-not-allowed');
+
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('opacity-50', 'cursor-not-allowed');
+                        break;
+
+                    case 'stopped':
+                        statusIndicator.className = 'w-3.5 h-3.5 rounded-full bg-slate-400';
+                        statusText.textContent = 'Pronto per iniziare';
+                        statusText.className = 'font-semibold text-slate-700 dark:text-slate-200';
+
+                        btnStart.disabled = false;
+                        btnStart.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btnStart.querySelector('span').textContent = "Inizia";
+
+                        btnPause.disabled = true;
+                        btnPause.classList.add('opacity-50', 'cursor-not-allowed');
+
+                        btnStop.disabled = true;
+                        btnStop.classList.add('opacity-50', 'cursor-not-allowed');
+
+                        interimText.textContent = '';
+                        interimIcon.classList.add('hidden');
+                        break;
+                }
+            }
+
+            // 7. Utilities (Copy, Downloads, Modals)
+            btnCopy.addEventListener('click', () => {
+                if (!finalText.value) return showToast("Nessun testo da copiare!", true);
+                
+                finalText.select();
+                document.execCommand('copy');
+                window.getSelection().removeAllRanges();
+                showToast("Testo copiato negli appunti!");
+            });
+
+            btnDownloadTxt.addEventListener('click', () => {
+                if (!finalText.value) return showToast("Nessun testo da scaricare!", true);
+                
+                const blob = new Blob([finalText.value], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Lezione_${getFormattedFilenameDate()}.txt`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("Trascrizione scaricata (.TXT)");
+            });
+
+            btnDownloadAudio.addEventListener('click', () => {
+                if (!audioBlob) return showToast("Nessuna registrazione audio presente!", true);
+
+                const url = URL.createObjectURL(audioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Registrazione_Audio_${getFormattedFilenameDate()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("Audio scaricato (.WEBM)");
+            });
+
+            // Modal Clear confirmation
+            btnClear.addEventListener('click', () => {
+                if (!finalText.value) return showToast("Il testo è già vuoto!", true);
+                
+                modalConfirm.classList.remove('opacity-0', 'pointer-events-none');
+                modalBox.classList.remove('scale-95');
+                modalBox.classList.add('scale-100');
+            });
+
+            btnModalCancel.addEventListener('click', closeModal);
+            modalConfirm.addEventListener('click', (e) => {
+                if (e.target === modalConfirm) closeModal();
+            });
+
+            btnModalConfirm.addEventListener('click', () => {
+                finalText.value = '';
+                localStorage.removeItem(LOCAL_STORAGE_KEY);
+                closeModal();
+                showToast("Trascrizione cancellata");
+            });
+
+            function closeModal() {
+                modalConfirm.classList.add('opacity-0', 'pointer-events-none');
+                modalBox.classList.remove('scale-100');
+                modalBox.classList.add('scale-95');
+            }
+
+            // Timer Helper
+            function startTimer() {
+                timerText.classList.remove('hidden');
+                if (!timerInterval) {
+                    timerInterval = setInterval(() => {
+                        elapsedSeconds++;
+                        const hrs = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
+                        const mins = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
+                        const secs = String(elapsedSeconds % 60).padStart(2, '0');
+                        timerText.textContent = `Durata: ${hrs}:${mins}:${secs}`;
+                    }, 1000);
+                }
+            }
+
+            function stopTimer() {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            // Formatting Helpers
+            function getFormattedTimestamp() {
+                const now = new Date();
+                const h = String(now.getHours()).padStart(2, '0');
+                const m = String(now.getMinutes()).padStart(2, '0');
+                const s = String(now.getSeconds()).padStart(2, '0');
+                return `[${h}:${m}:${s}]`;
+            }
+
+            function getFormattedFilenameDate() {
+                const now = new Date();
+                return `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}_${now.getHours()}${now.getMinutes()}`;
+            }
+
+            function capitalizeFirstLetter(string) {
+                return string.charAt(0).toUpperCase() + string.slice(1);
+            }
+
+            function showToast(message, isError = false) {
+                toastMsg.textContent = message;
+                toastIcon.className = isError 
+                    ? 'fas fa-exclamation-circle text-red-400 dark:text-red-500' 
+                    : 'fas fa-check-circle text-green-400 dark:text-green-500';
+
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
